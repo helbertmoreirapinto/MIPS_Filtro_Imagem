@@ -3,34 +3,33 @@
 	f_out:		.asciiz "out.pgm"	# File OUT
 	menu_p:		.asciiz "Filtros de Imagem\n[1]Filtro x\n[2]Filtro y\n[3]Filtro z\n[0]Sair\nSelecione: "
 	new_line:	.word 0x0A
-	cont_xbyte:	.word 0
-	cont_ybyte:	.word 0
+	tamX_pic:	.word 0
+	tamY_pic:	.word 0
 	val_byte:	.space 0x04
 	temp:		.space 0x01
-	buffer:		.space 0x00019000		#100kBytes -> 100 * 1024 = 102400
-	
+	buffer:		.space 0x00019000	#100kBytes -> 100 * 1024 = 102400
+
 .text
 .globl main
 
 main:
-
 	# Open File IN [Read]
-	li $v0 0x0D		# system call for open file
-	la $a0 f_in		# input file name
-	li $a1 0x00		# flag for read
-	li $a2 0x00		# mode is ignored
-	syscall			# open file
+	li $v0 0x0D	# system call for open file
+	la $a0 f_in	# input file name
+	li $a1 0x00	# flag for read
+	li $a2 0x00	# mode is ignored
+	syscall		# open file
 	move $k0 $v0	# K0 -> File IN
 	
 	# Check sucess open File IN
 	beq $s0 0xFFFFFFFF END_PROGRAM
 	
 	# Open File OUT [Write]
-	li $v0 0x0D		# system call for open file
+	li $v0 0x0D	# system call for open file
 	la $a0 f_out	# input file name
-	li $a1 0x01		# flag for write
-	li $a2 0x00		# mode is ignored
-	syscall			# open file
+	li $a1 0x01	# flag for write
+	li $a2 0x00	# mode is ignored
+	syscall		# open file
 	move $k1 $v0	# K1 -> File OUT
 	
 	beq $s1 0xFFFFFFFF END_PROGRAM
@@ -38,22 +37,61 @@ main:
 	# Step header File IN
 	lw $t0 new_line
 	li $t3 0x00
-LOOP_CHAR:
+LOOP_ENTER:
+	li $v0 0x0E
+	move $a0 $k0
+	la $a1 temp
+	li $a2 0x01
+	syscall
+	lw $t1 temp
+	bne $t0 $t1 LOOP_ENTER	# Check if char is '\n'
+	addi $t3 0x01			# Inc cont '\n'
+	bne $t3 0x02 LOOP_ENTER	# Step 02 '\n'
+
+	li $t0 0x20		# Space 0x20 32 ' '
+	li $t3 0x00
+SAVE_RANGE:
+	la $t4 val_byte
+LOOP_RANGE:
 	li $v0 0x0E		# system call for reading from file
 	move $a0 $k0	# file descriptor
 	la $a1 temp		# address of buffer from which to read
 	li $a2 0x01		# read 01 byte (char)
 	syscall			# read file
 	lw $t1 temp
-	bne $t0 $t1 LOOP_CHAR	# Check if char is <ENTER>
-	addi $t3 0x01			# Inc cont '\n' <ENTER>
-	bne $t3 0x02 LOOP_CHAR	# Step 02 '\n' <ENTER>
+	beq $t0 $t1 SAVE_X	# Check if char is space
+	sb $t1 ($t4)
+	addi $t4 0x01
+	j LOOP_RANGE
 
-	# int x <- ler ate espaco
-	# int y <- ler ate espaco
+SAVE_X:
+	addi $t3 0x01
+	beq $t3 0x02 SAVE_Y
+	lw $t0 new_line
+	# x <- val_byte
+	la $a0 val_byte
+	jal STRING_TO_INT
+	sw $v0 tamX_pic
+	j SAVE_RANGE
 	
+SAVE_Y:
+	# y <- val_byte
+	la $a0 val_byte
+	jal STRING_TO_INT
+	sw $v0 tamY_pic
+
+	lw $t0 new_line
+LOOP_ENTER_2:
+	li $v0 0x0E
+	move $a0 $k0
+	la $a1 temp
+	li $a2 0x01
+	syscall
+	lw $t1 temp
+	bne $t0 $t1 LOOP_ENTER_2
+
 	# Buffer
-	li $v0 0x0E		# system call for reading from file
+	li $v0 0x0E	# system call for reading from file
 	move $a0 $k0	# file descriptor
 	la $a1 buffer   # address of buffer from which to read
 	li $a2 0x19000	# hardcoded buffer length
@@ -110,5 +148,40 @@ END_PROGRAM:
 	syscall
 
 
+STRING_TO_INT:
+	li $v0 0x00
+	li $s0 0x00
+	li $s6 0x2F
+	li $s7 0x3A
+	move $s1 $a0
+	
+POS_CHAR:
+	lb $s5 ($s1)
+	slt $s4 $s5 $s6 	# '0' - 1
+	beq $s4 0x01 EXIT_LOOP
+	slt $s4 $s7 $s5 	# '9' + 1
+	beq $s4 0x01 EXIT_LOOP
+	addi $s0 0x01	# cont caracteres string
+	addi $s1 0x01
+	j POS_CHAR
+EXIT_LOOP:
+	move $s1 $a0
+	lb $s2 ($s1)
+	addi $s2 0xFFFFFFD0
+	addi $s0 -1
+	move $s3 $s0
+CALC:
+	addi $s3 -1
+	mul $s2 $s2 0x0A
+	bnez $s3 CALC
+	addu $v0 $v0 $s2
+	addi $s0 -1
+	move $s3 $s0
+	beqz $s3 SAIR
+	addi $s1 1
+	lb $s2 ($s1)
+	addi $s2 0xFFFFFFD0
+	j CALC
 
-
+SAIR: 
+jr $ra
