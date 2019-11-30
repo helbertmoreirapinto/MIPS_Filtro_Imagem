@@ -148,6 +148,7 @@ END_PROGRAM:
 	syscall
 
 
+#SUB ROTINA - Converte uma string contendo um numero para int
 STRING_TO_INT:
 	li $v0 0x00
 	li $s0 0x00
@@ -168,20 +169,23 @@ EXIT_LOOP:
 	move $s1 $a0
 	lb $s2 ($s1)
 	addi $s2 0xFFFFFFD0
-	addi $s0 -1
+	addi $s0 0xFFFFFFFF
 	move $s3 $s0
 CALC:
-	addi $s3 -1
+	addi $s3 0xFFFFFFFF
 	mul $s2 $s2 0x0A
 	bnez $s3 CALC
 	addu $v0 $v0 $s2
-	addi $s0 -1
+	addi $s0 0xFFFFFFFF
 	move $s3 $s0
 	beqz $s3 SAIR
-	addi $s1 1
+	addi $s1 0x01
 	lb $s2 ($s1)
 	addi $s2 0xFFFFFFD0
 	j CALC
-
-SAIR: 
-jr $ra
+SAIR:
+	addi $s1 0x01
+	lb $s2 ($s1)
+	addi $s2 0xFFFFFFD0
+	addu $v0 $v0 $s2
+	jr $ra
