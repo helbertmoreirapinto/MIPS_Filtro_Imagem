@@ -13,6 +13,7 @@
 .globl main
 
 main:
+
 	# Open File IN [Read]
 	li $v0 0x0D	# system call for open file
 	la $a0 f_in	# input file name
@@ -48,6 +49,7 @@ LOOP_ENTER:
 	addi $t3 0x01			# Inc cont '\n'
 	bne $t3 0x02 LOOP_ENTER	# Step 02 '\n'
 
+	# Save X and Save Y
 	li $t0 0x20		# Space 0x20 32 ' '
 	li $t3 0x00
 SAVE_RANGE:
@@ -147,7 +149,7 @@ END_PROGRAM:
 	li $v0 0x0A
 	syscall
 
-
+#-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
 #SUB ROTINA - Converte uma string contendo um numero para int
 STRING_TO_INT:
 	li $v0 0x00
@@ -158,19 +160,21 @@ STRING_TO_INT:
 	
 POS_CHAR:
 	lb $s5 ($s1)
-	slt $s4 $s5 $s6 	# '0' - 1
+	slt $s4 $s5 $s6 	# Check < '0'
 	beq $s4 0x01 EXIT_LOOP
-	slt $s4 $s7 $s5 	# '9' + 1
+	slt $s4 $s7 $s5 	# Check > '9'
 	beq $s4 0x01 EXIT_LOOP
 	addi $s0 0x01	# cont caracteres string
 	addi $s1 0x01
 	j POS_CHAR
+	
 EXIT_LOOP:
 	move $s1 $a0
 	lb $s2 ($s1)
 	addi $s2 0xFFFFFFD0
 	addi $s0 0xFFFFFFFF
 	move $s3 $s0
+	
 CALC:
 	addi $s3 0xFFFFFFFF
 	mul $s2 $s2 0x0A
@@ -178,14 +182,73 @@ CALC:
 	addu $v0 $v0 $s2
 	addi $s0 0xFFFFFFFF
 	move $s3 $s0
-	beqz $s3 SAIR
+	beqz $s3 RET
 	addi $s1 0x01
 	lb $s2 ($s1)
 	addi $s2 0xFFFFFFD0
 	j CALC
-SAIR:
+	
+RET:
 	addi $s1 0x01
 	lb $s2 ($s1)
 	addi $s2 0xFFFFFFD0
 	addu $v0 $v0 $s2
+	jr $ra
+
+#-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
+#SUB ROTINA - Converte um int em uma string cujos caracteres e' o int
+INT_TO_STRING:
+	move $v0 $a0
+	move $v1 $a1
+	
+	li $s0 0x04
+	li $s1 0x00
+ZERAR:
+	sb $s1 ($v0)
+	addi $v0 0x01
+	addi $s0 0xFFFFFFFF
+	bnez $s0 ZERAR
+	move $v0 $a0
+	
+	move $s1 $v1
+	li $s0 0x3E8
+	div $s1 $s1 $s0
+	beqz $s1 DIG0_NULL
+	move $s2 $s1
+	addi $s1 0x30
+	sb $s1 ($v0)
+	addi $v0 0x01
+DIG0_NULL:
+	mul $s1 $s2 0x3E8
+	sub $v1 $v1 $s1
+	
+	move $s1 $v1
+	li $s0 0x64
+	div $s1 $s1 $s0
+	beqz $s1 DIG1_NULL
+	move $s2 $s1
+	addi $s1 0x30
+	sb $s1 ($v0)
+	addi $v0 0x01
+DIG1_NULL:
+	mul $s1 $s2 0x64
+	sub $v1 $v1 $s1
+	
+	move $s1 $v1
+	li $s0 0x0A
+	div $s1 $s1 $s0
+	beqz $s1 DIG2_NULL
+	move $s2 $s1
+	addi $s1 0x30
+	sb $s1 ($v0)
+	addi $v0 0x01
+DIG2_NULL:
+	mul $s1 $s2 0x0A
+	sub $v1 $v1 $s1
+	
+	move $s1 $v1
+	addi $s1 0x30
+	sb $s1 ($v0)
+	
+	move $v0 $a0
 	jr $ra
