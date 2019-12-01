@@ -1,7 +1,7 @@
 .data
 	f_in:		.asciiz "in.pgm"	# File IN
 	f_out:		.asciiz "out.pgm"	# File OUT
-	menu_p:		.asciiz "Filtros de Imagem\n[1]Filtro x\n[2]Filtro y\n[3]Filtro z\n[0]Sair\nSelecione: "
+	menu_p:		.asciiz "Filtros de Imagem\n[1]Filtro Identy\n[2]Filtro Emboss\n[3]Filtro Sharpen\n[0]Sair\nSelecione: "
 	cab:		.asciiz "P2\n# Make by Antonio Sebastian / Helbert Pinto #\n"
 	new_line:	.asciiz "\n"
 	c_space:	.asciiz " "
@@ -111,40 +111,50 @@ INICIAR_BUFFER:
 	# Get int keyboard
 	li $v0 0x05	# system call for get int keyboard
 	syscall		# get int keyboard
+	move $t7 $v0
+	
+	# Write cab File OUT
+	la $t0 cab			# cab
+	la $t1 val_byte		# val_byte
+	la $t2 new_line		# new_line
+	la $t3 c_space		# c_space
+	lw $t4 tamPicX		# tamX
+	lw $t5 tamPicY		# tamY
+	lw $t6 max_value	# max_val
+	
+	sub $sp $sp 0x20	
+	sw $k1 00($sp)	# File OUT
+	sw $t0 04($sp)	# cab
+	sw $t1 08($sp)	# val_byte
+	sw $t2 12($sp)	# new_line
+	sw $t3 16($sp)	# c_space
+	sw $t4 20($sp)	# tamX
+	sw $t5 24($sp)	# tamY
+	sw $t6 28($sp)	# max_val
+	jal ESCREVE_CAB
 	
 	# Select filter
-	beq $v0 0x01 FILTRO_1
-	beq $v0 0x02 FILTRO_2
-	beq $v0 0x03 FILTRO_3
-	beq $v0 $zero END_PROGRAM
+	beq $t7 0x01 FILTRO_1
+	beq $t7 0x02 FILTRO_2
+	beq $t7 0x03 FILTRO_3
+	beq $t7 $zero END_PROGRAM
 	
 FILTRO_1:
-	# Filter 1 - x
-	# Write File OUT
-	
-	addi $sp $sp -0x0C
-	lw $a3 tamPicX
-	sw $a3 0($sp)
-	lw $a3 tamPicY
-	sw $a3 4($sp)
-	lw $a3 max_value
-	sw $a3 8($sp)
-	
-	move $a0 $k1
-	la $a1 cab
-	la $a2 val_byte
-	la $a3 c_space
-	jal ESCREVE_CAB
-    
+	# Filter 1 - Identy
+	la $t0 buffer	# Matriz
+	lw $t0 tamPicX	# Max I
+	lw $t1 tamPicY	# Max J
+	li $t2 0x00		# I
+	li $t3 0x00		# J
 	
 	j CLOSE_FILE
 	
 FILTRO_2:
-	# Filter 2 - y
+	# Filter 2 - Emboss
 	j CLOSE_FILE
 	
 FILTRO_3:
-	# Filter 3 - z
+	# Filter 3 - Sharpen
 	j CLOSE_FILE
 
 CLOSE_FILE:
@@ -299,53 +309,123 @@ DIG2_NULL:
 #-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
 #SUB ROTINA - Escreve cabecalho File OUT
 ESCREVE_CAB:
-	move $s0 $a0	# File OUT
-	move $s1 $a1	# cab
-	move $s2 $a2	# val_byte
-	move $s3 $a3	# c_space
-	lw $s4 0($sp)	# tamX
-	lw $s5 4($sp)	# tamY
-	lw $s6 8($sp)	# max_val
-	addi $sp $sp 0x0C
+	lw $s0 0($sp)	# File OUT
+	lw $s1 4($sp)	# cab
+	lw $s2 8($sp)	# val_byte
+	lw $s3 12($sp)	# new_line
+	lw $s4 16($sp)	# c_space
+	lw $s5 20($sp)	# tamX
+	lw $s6 24($sp)	# tamY
+	lw $s7 28($sp)	# max_val
+	addi $sp $sp 0x20
 	
 	# Write cab in File OUT
+	li $v0 0x0F
 	move $a0 $s0
-    li $v0 0x0F
    	move $a1 $s1
-	la $a2 0x31
+	la   $a2 0x31
     syscall
 	
+	# X int to string 
 	move $a0 $s2
-	move $a1 $s4
-	sub $sp $sp 12
-	sw $ra 8($sp)
-	sw $s0 4($sp)
-	sw $s3 0($sp)
+	move $a1 $s5
+	sub $sp $sp 0x20
+	sw $ra 28($sp)
+	sw $s7 24($sp)
+	sw $s6 20($sp)
+	sw $s4 16($sp)
+	sw $s3 12($sp)
+	sw $s2 08($sp)
+	sw $s1 04($sp)
+	sw $s0 00($sp)
 	jal INT_TO_STRING
-	move $s2 $v0
-	lw $s3 0($sp)
-	lw $s0 4($sp)
-	lw $ra 8($sp)
-	add $sp $sp 12
-
-	addi $sp $sp 0x40
+	move $s5 $v0
+	lw $s0 00($sp)	# File OUT
+	lw $s1 04($sp)	# cab
+	lw $s2 08($sp)	# val_byte
+	lw $s3 12($sp)	# new_line
+	lw $s4 16($sp)	# c_space
+	lw $s6 20($sp)	# tamY
+	lw $s7 24($sp)	# max_val
+	lw $ra 28($sp)
+	addi $sp $sp 0x20
 	
-	move $a0 $s0
+	# Write X
     li $v0 0x0F
-    move $a1 $s2
-    la $a2 0x03
+	move $a0 $s0
+    move $a1 $s5
+    la   $a2 0x03
     syscall
 	
-	move $a0 $s0
+	# Write space
     li $v0 0x0F
-    move $a1 $s3
-    la $a2 0x1
+    move $a0 $s0
+	move $a1 $s4
+    la   $a2 0x1
     syscall
 	
-	move $a0 $s0
+	# Y int to string
+	move $a0 $s2
+	move $a1 $s6
+	sub $sp $sp 0x18
+	sw $ra 24($sp)
+	sw $s7 20($sp)
+	sw $s3 12($sp)
+	sw $s2 08($sp)
+	sw $s1 04($sp)
+	sw $s0 00($sp)
+	jal INT_TO_STRING
+	move $s6 $v0
+	lw $s0 00($sp)	# File OUT
+	lw $s1 04($sp)	# cab
+	lw $s2 08($sp)	# val_byte
+	lw $s3 12($sp)	# new_line
+	lw $s7 20($sp)	# max_val
+	lw $ra 24($sp)
+	addi $sp $sp 0x18
+	
+	# Write Y
+	li $v0 0x0F
+    move $a0 $s0
+	move $a1 $s6
+    la   $a2 0x03
+    syscall
+	
+	# Write enter
     li $v0 0x0F
-    move $a1 $s2
-    la $a2 0x03
+    move $a0 $s0
+	move $a1 $s3
+    la   $a2 0x01
+    syscall
+	
+	# max int to string
+	move $a0 $s2
+	move $a1 $s7
+	sub $sp $sp 0x10
+	sw $ra 12($sp)
+	sw $s3 08($sp)
+	sw $s1 04($sp)
+	sw $s0 00($sp)
+	jal INT_TO_STRING
+	move $s7 $v0
+	lw $s0 00($sp)	# File OUT
+	lw $s1 04($sp)	# cab
+	lw $s3 08($sp)	# new_line
+	lw $ra 12($sp)
+	addi $sp $sp 0x10
+	
+	# Write MAX
+	li $v0 0x0F
+    move $a0 $s0
+	move $a1 $s7
+    la   $a2 0x03
+    syscall
+	
+	# Write enter
+    li $v0 0x0F
+    move $a0 $s0
+	move $a1 $s3
+    la   $a2 0x01
     syscall
 	
 	jr $ra
