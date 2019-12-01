@@ -53,40 +53,23 @@ STEP_HREADER:
 	bne $t0 $t1 STEP_HREADER	# Check t0['\n'] != t1[current char]
 	addi $t3 $t3 0x01		# Incr cont '\n'
 	bne $t3 0x02 STEP_HREADER	# Pular 02 '\n'
-
-	# Save X and Save Y
-	lb $t0 c_space	# Space 0x20 32 ' '
-	li $t3 0x00
-SAVE_RANGE:
-	la $t4 val_byte
-LOOP_RANGE:
-	li $v0 0x0E		# system call for reading from file
-	move $a0 $k0	# file descriptor
-	la $a1 temp		# address of buffer from which to read
-	li $a2 0x01		# read 01 byte (char)
-	syscall			# read file
-	lb $t1 temp
-	beq $t0 $t1 SAVE_X	# Check if char is space
-	sb $t1 ($t4)
-	addi $t4 $t4 0x01
-	j LOOP_RANGE
-
-SAVE_X:
-	addi $t3 $t3 0x01
-	beq $t3 0x02 SAVE_Y
-	lb $t0 new_line
-	# x <- val_byte
-	la $a0 val_byte
-	jal STRING_TO_INT
-	sw $v0 tamPicX
-	j SAVE_RANGE
 	
-SAVE_Y:
-	# y <- val_byte
-	la $a0 val_byte
-	jal STRING_TO_INT
-	sw $v0 tamPicY
+	la $t1 val_byte
+	la $t2 temp
+	sub $sp $sp 12
+	sw $k0 0($sp)	# File
+	sw $t1 4($sp)	# String val_byte
+	sw $t2 8($sp)	# Char 
+	jal GET_NUM_FILE
+	sw $v0 tamPicX
 
+	sub $sp $sp 12
+	sw $k0 0($sp)	# File
+	sw $t1 4($sp)	# String val_byte
+	sb $t2 8($sp)	# Char 
+	jal GET_NUM_FILE
+	sw $v0 tamPicY
+	
 	lb $t0 new_line
 LOOP_ENTER_2:
 	li $v0 0x0E
@@ -96,24 +79,28 @@ LOOP_ENTER_2:
 	syscall
 	lb $t1 temp
 	bne $t0 $t1 LOOP_ENTER_2
-	
+
 	lw $t0 tamPicX
 	lw $t2 tamPicY
 	mulu $t1 $t0 $t2
 	sw $t1 bytesPic
 	li $t0 0x00
 	la $t2 buffer
+	
+	la $t3 val_byte
+	la $t4 temp
+	
 INICIAR_BUFFER:
-	sw $zero ($t2)
+	sub $sp $sp 12
+	sw $k0 0($sp)	# File
+	sw $t3 4($sp)	# String val_byte
+	sw $t4 8($sp)	# Char 
+	jal GET_NUM_FILE
+	beq $v0 0xFFFFFFFF INICIAR_BUFFER 
+	sw $v0 ($t2)
 	addi $t2 $t2 0x04
 	addi $t0 $t0 0x01
 	bne $t0 $t1 INICIAR_BUFFER
-	# Buffer
-	#li $v0 0x0E	# system call for reading from file
-	#move $a0 $k0	# file descriptor
-	#la $a1 buffer   # address of buffer from which to read
-	#li $a2 0x19000	# hardcoded buffer length
-	#syscall
 	
 	# MENU
 	# Print menu_p in console
@@ -200,6 +187,8 @@ EXIT_LOOP:
 	lb $s2 ($s1)
 	addi $s2 $s2 0xFFFFFFD0
 	addi $s0 $s0 0xFFFFFFFF
+	beq $s0 0xFFFFFFFF RET_NULL
+	beqz $s0 RET_ZERO
 	move $s3 $s0
 	
 CALC:
@@ -220,6 +209,24 @@ RET:
 	lb $s2 ($s1)
 	addi $s2 $s2 0xFFFFFFD0
 	addu $v0 $v0 $s2
+
+	li $s0 0x04
+	li $s1 0x00
+	move $s2 $a0
+LIMPAR_VET:
+	sb $s1 ($s2)
+	addi $s2 $s2 0x01
+	addi $s0 $s0 0xFFFFFFFF
+	bnez $s0 LIMPAR_VET
+	
+	jr $ra
+	
+RET_NULL:
+	li $v0 0xFFFFFFFF
+	jr $ra
+	
+RET_ZERO:
+	li $v0 0x00
 	jr $ra
 
 #-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
@@ -340,5 +347,42 @@ ESCREVE_CAB:
     move $a1 $s2
     la $a2 0x03
     syscall
+	
+	jr $ra
+
+#-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
+#SUB ROTINA - Pega um numero do numero do arquivo(string), converte para int e retorna 
+GET_NUM_FILE:
+	lw $s0 0($sp)	# File
+	lw $s1 4($sp)	# String val_byte
+	lw $s2 8($sp)	# Char temp
+	addi $sp $sp 0x0C
+	li $s3 0x2F
+	li $s4 0x3A
+	move $s7 $s1
+	
+LER_NUM:
+	li $v0 0x0E		# system call for reading from file
+	move $a0 $s0	# file descriptor
+	move $a1 $s2	# address of buffer from which to read
+	li $a2 0x01		# read 01 byte (char)
+	syscall			# read file
+	
+	lb $s5 ($s2)
+	slt $s6 $s5 $s3
+	beq $s6 0x01 END_NUM
+	slt $s6 $s4 $s5
+	beq $s6 0x01 END_NUM
+	
+	sb $s5 ($s7)
+	addi $s7 $s7 0x01
+	j LER_NUM
+END_NUM:
+	
+	sub $sp $sp 4
+	sw $ra 0($sp)
+	move $a0 $s1
+	jal STRING_TO_INT
+	lw $ra 0($sp)
 	
 	jr $ra
