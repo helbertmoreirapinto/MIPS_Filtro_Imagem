@@ -5,16 +5,20 @@
 	cab:		.asciiz "P2\n# Make by Antonio Sebastian / Helbert Pinto #\n"
 	new_line:	.asciiz "\n"
 	c_space:	.asciiz " "
-
-	val_byte:	.space 0x04
-	temp:		.space 0x01
-		
+	
+	FilIdenty:	.word  0, 0,0, 0,1, 0,0, 0,0
+	FilEmboss:	.word -2,-1,0,-1,1, 1,0, 1,2
+	FilSharpen:	.word  0,-1,0,-1,5,-1,0,-1,0
 	tamPicX:	.word 0
 	tamPicY:	.word 0
 	bytesPic:	.word 0
-	max_value:	.word 255
-	buffer:		.word 0
+	max_value:	.word 0
 
+	val_byte:	.space 0x04
+	temp:		.space 0x01
+	.align 2
+	buffer:		.space 0x00019000 #100kBits
+	
 .text
 .globl main
 
@@ -28,7 +32,7 @@ main:
 	move $k0 $v0	# K0 -> File IN
 	
 	# Check sucess open File IN
-	beq $k0 0xFFFFFFFF END_PROGRAM
+	beq $k0 -1 END_PROGRAM
 	
 	# Open File OUT [Write]
 	li $v0 0x0D	# system call for open file
@@ -38,7 +42,7 @@ main:
 	syscall		# open file
 	move $k1 $v0	# K1 -> File OUT
 	
-	beq $k1 0xFFFFFFFF END_PROGRAM
+	beq $k1 -1 END_PROGRAM
 	
 	# Step header File IN
 	lb $t0 new_line
@@ -56,13 +60,15 @@ STEP_HREADER:
 	
 	la $t1 val_byte
 	la $t2 temp
+	# Save X
 	sub $sp $sp 12
 	sw $k0 0($sp)	# File
 	sw $t1 4($sp)	# String val_byte
 	sw $t2 8($sp)	# Char 
 	jal GET_NUM_FILE
 	sw $v0 tamPicX
-
+	
+	# Save Y
 	sub $sp $sp 12
 	sw $k0 0($sp)	# File
 	sw $t1 4($sp)	# String val_byte
@@ -70,37 +76,42 @@ STEP_HREADER:
 	jal GET_NUM_FILE
 	sw $v0 tamPicY
 	
-	lb $t0 new_line
-LOOP_ENTER_2:
 	li $v0 0x0E
 	move $a0 $k0
-	la $a1 temp
-	li $a2 0x01
+	la   $a1 temp
+	li   $a2 0x01
 	syscall
-	lb $t1 temp
-	bne $t0 $t1 LOOP_ENTER_2
+	
+	# Save Max value
+	sub $sp $sp 12
+	sw $k0 0($sp)	# File
+	sw $t1 4($sp)	# String val_byte
+	sb $t2 8($sp)	# Char 
+	jal GET_NUM_FILE
+	sw $v0 max_value
 
 	lw $t0 tamPicX
 	lw $t2 tamPicY
 	mulu $t1 $t0 $t2
 	sw $t1 bytesPic
+	addi $t1 $t1 0x01
 	li $t0 0x00
 	la $t2 buffer
 	
 	la $t3 val_byte
 	la $t4 temp
 	
-INICIAR_BUFFER:
+WRITE_BUFFER:
 	sub $sp $sp 12
 	sw $k0 0($sp)	# File
 	sw $t3 4($sp)	# String val_byte
-	sw $t4 8($sp)	# Char 
+	sw $t4 8($sp)	# Char temp
 	jal GET_NUM_FILE
-	beq $v0 0xFFFFFFFF INICIAR_BUFFER 
+	beq $v0 -1 WRITE_BUFFER 
 	sw $v0 ($t2)
 	addi $t2 $t2 0x04
 	addi $t0 $t0 0x01
-	bne $t0 $t1 INICIAR_BUFFER
+	bne $t0 $t1 WRITE_BUFFER
 	
 	# MENU
 	# Print menu_p in console
@@ -134,28 +145,130 @@ INICIAR_BUFFER:
 	jal ESCREVE_CAB
 	
 	# Select filter
-	beq $t7 0x01 FILTRO_1
-	beq $t7 0x02 FILTRO_2
-	beq $t7 0x03 FILTRO_3
+	beq $t7 0x01 SEL_FILTRO_1
+	beq $t7 0x02 SEL_FILTRO_2
+	beq $t7 0x03 SEL_FILTRO_3
 	beq $t7 $zero END_PROGRAM
-	
-FILTRO_1:
+
+SEL_FILTRO_1:
 	# Filter 1 - Identy
-	la $t0 buffer	# Matriz
-	lw $t0 tamPicX	# Max I
-	lw $t1 tamPicY	# Max J
-	li $t2 0x00		# I
-	li $t3 0x00		# J
+	j APLICAR_FILTRO
 	
-	j CLOSE_FILE
-	
-FILTRO_2:
+SEL_FILTRO_2:
 	# Filter 2 - Emboss
-	j CLOSE_FILE
+	j APLICAR_FILTRO
 	
-FILTRO_3:
+SEL_FILTRO_3:
 	# Filter 3 - Sharpen
+	j APLICAR_FILTRO
+
+APLICAR_FILTRO:
+	la $t0 buffer	# Matriz
+	lw $t1 tamPicX	# Max I
+	lw $t2 tamPicY	# Max J
+	li $t3 0x00		# I
+	li $t4 0x00		# J
+	li $t5 0x00		# indice ref pixel
+	li $t6 0x00		# indice_aux
+	li $t7 0x00		# Soma
+
+RODAR_MATRIZ:
+	mul $t5 $t3 0x64
+	add $t5 $t5 $t4
+
+	beqz $t3 PIXEL_BORDA
+	beq $t1 $t3 PIXEL_BORDA
+	beqz $t4 PIXEL_BORDA
+	beq $t2 $t4 PIXEL_BORDA
+	li $t7 0x00
+NAO_BORDA:
+	sub $t6 $t5 0x65
+	li $t8 0x00 	# multiplicador pixel Top-Left
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	sub $t6 $t5 0x64
+	li $t8 0x00 	# multiplicador pixel Top
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+
+	sub $t6 $t5 0x63
+	li $t8 0x00 	# multiplicador pixel Top-Right
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	sub $t6 $t5 0x01
+	li $t8 0x00 	# multiplicador pixel Left
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	li $t8 0x01 	# multiplicador pixel Center
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	addi $t6 $t5 0x01
+	li $t8 0x00 	# multiplicador pixel Right
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	addi $t6 $t5 0x63
+	li $t8 0x00 	# multiplicador pixel Botton-Left
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+	
+	addi $t6 $t5 0x64
+	li $t8 0x00 	# multiplicador pixel Botton
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+
+	addi $t6 $t5 0x65
+	li $t8 0x00 	# multiplicador pixel Botton-Right
+	move $a0 $t0		# Buffer
+	move $a1 $t6		# indice
+	move $a2 $t8		# multiplicador
+	jal CALCULO_VALOR_PIXEL
+	add $t7 $t7 $v0
+
+PIXEL_BORDA:
+	
+	#escrever $t7 como string no output.pgm
+	#escrever space no output.pgm
+	
+	
+	addi $t4 $t4 0x01
+	bne $t2 $t4 RODAR_MATRIZ
+	beq $t1 $t3 FIM_FILTRO
+RESET_LINHA:
+	addi $t3 $t3 1
+	li $t4 0x00
+	j RODAR_MATRIZ
+FIM_FILTRO:
 	j CLOSE_FILE
+
 
 CLOSE_FILE:
 	# Close File IN
@@ -195,29 +308,29 @@ POS_CHAR:
 EXIT_LOOP:
 	move $s1 $a0
 	lb $s2 ($s1)
-	addi $s2 $s2 0xFFFFFFD0
-	addi $s0 $s0 0xFFFFFFFF
-	beq $s0 0xFFFFFFFF RET_NULL
+	sub $s2 $s2 0x30
+	sub $s0 $s0 0x01
+	beq $s0 -1 RET_NULL
 	beqz $s0 RET_ZERO
 	move $s3 $s0
 	
 CALC:
-	addi $s3 $s3 0xFFFFFFFF
+	sub $s3 $s3 0x01
 	mul $s2 $s2 0x0A
 	bnez $s3 CALC
 	addu $v0 $v0 $s2
-	addi $s0 $s0 0xFFFFFFFF
+	sub $s0 $s0 0x01
 	move $s3 $s0
 	beqz $s3 RET
 	addi $s1 $s1 0x01
 	lb $s2 ($s1)
-	addi $s2 $s2 0xFFFFFFD0
+	sub $s2 $s2 0x30
 	j CALC
 	
 RET:
 	addi $s1 $s1 0x01
 	lb $s2 ($s1)
-	addi $s2 $s2 0xFFFFFFD0
+	sub $s2 $s2 0x30
 	addu $v0 $v0 $s2
 
 	li $s0 0x04
@@ -226,13 +339,13 @@ RET:
 LIMPAR_VET:
 	sb $s1 ($s2)
 	addi $s2 $s2 0x01
-	addi $s0 $s0 0xFFFFFFFF
+	sub $s0 $s0 0x01
 	bnez $s0 LIMPAR_VET
 	
 	jr $ra
 	
 RET_NULL:
-	li $v0 0xFFFFFFFF
+	li $v0 -1
 	jr $ra
 	
 RET_ZERO:
@@ -252,7 +365,7 @@ INT_TO_STRING:
 ZERAR:
 	sb $s1 ($v0)
 	addi $v0 $v0 0x01
-	addi $s0 $s0 0xFFFFFFFF
+	sub $s0 $s0 0x01
 	bnez $s0 ZERAR
 	move $v0 $a0
 	
@@ -464,5 +577,17 @@ END_NUM:
 	move $a0 $s1
 	jal STRING_TO_INT
 	lw $ra 0($sp)
+	
+	jr $ra
+	
+CALCULO_VALOR_PIXEL:
+	move $s0 $a0	# END Buffer
+	move $s1 $a1	# INT indice vetor
+	move $s2 $a2	# INT multiplicador
+	
+	mul $s1 $s1 0x04
+	add $s0 $s0 $s1
+	lw $s3 ($s0)
+	mul $v0 $s2 $s3
 	
 	jr $ra
