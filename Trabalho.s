@@ -1,6 +1,6 @@
 .data
-	f_in:		.asciiz "in.pgm"	# File IN
-	f_out:		.asciiz "out.pgm"	# File OUT
+	f_in:		.asciiz "input.pgm"		# File IN
+	f_out:		.asciiz "output.pgm"	# File OUT
 	menu_p:		.asciiz "Filtros de Imagem\n[1]Filtro Identy\n[2]Filtro Emboss\n[3]Filtro Sharpen\n[0]Sair\nSelecione: "
 	cab:		.asciiz "P2\n# Make by Antonio Sebastian / Helbert Pinto #\n"
 	new_line:	.asciiz "\n"
@@ -94,7 +94,7 @@ STEP_HREADER:
 	lw $t2 tamPicY
 	mulu $t1 $t0 $t2
 	sw $t1 bytesPic
-	addi $t1 $t1 0x01
+	#addi $t1 $t1 0x01
 	li $t0 0x00
 	la $t2 buffer
 	
@@ -171,17 +171,21 @@ APLICAR_FILTRO:
 	li $t5 0x00		# indice ref pixel
 	li $t6 0x00		# indice_aux
 	li $t7 0x00		# Soma
-
+	la $t9 c_space
+	
 RODAR_MATRIZ:
+	
+	li $t7 0x00
+	
+	beqz $t3 INSERE_PIXEL_FILE_OUT
+	beq $t1 $t3 INSERE_PIXEL_FILE_OUT
+	beqz $t4 INSERE_PIXEL_FILE_OUT
+	beq $t2 $t4 INSERE_PIXEL_FILE_OUT
+	
 	mul $t5 $t3 0x64
 	add $t5 $t5 $t4
-
-	beqz $t3 PIXEL_BORDA
-	beq $t1 $t3 PIXEL_BORDA
-	beqz $t4 PIXEL_BORDA
-	beq $t2 $t4 PIXEL_BORDA
-	li $t7 0x00
-NAO_BORDA:
+	
+CALC_PIXEL:
 	sub $t6 $t5 0x65
 	li $t8 0x00 	# multiplicador pixel Top-Left
 	move $a0 $t0		# Buffer
@@ -253,18 +257,55 @@ NAO_BORDA:
 	jal CALCULO_VALOR_PIXEL
 	add $t7 $t7 $v0
 
-PIXEL_BORDA:
+	slt $t8 $t7 $zero 
+	beq $t8 0x01 NEG
+	li $t8 0xFF
+	slt $t8 $t8 $t7
+	beq $t8 0x01 OVER
+	j INSERE_PIXEL_FILE_OUT
+NEG:
+	li $t7 0x00
+	j INSERE_PIXEL_FILE_OUT
+OVER:
+	li $t7 0xFF
+	j INSERE_PIXEL_FILE_OUT
 	
-	#escrever $t7 como string no output.pgm
-	#escrever space no output.pgm
+INSERE_PIXEL_FILE_OUT:
+	la $a0 val_byte
+	move $a1 $t7 
+	jal INT_TO_STRING
+	move $t7 $v0	# String com numero
+	move $t8 $v1	# Qtdade de digitos
 	
+	# Escreve o pixel no file OUT
+	li $v0 0x0F
+    move $a0 $k1
+	move $a1 $t7
+    move $a2 $t8
+    syscall
+	
+	# Escreve espaco no File OUT
+	li $v0 0x0F
+    move $a0 $k1
+	move $a1 $t9
+    li $a2 0x01
+    syscall
 	
 	addi $t4 $t4 0x01
 	bne $t2 $t4 RODAR_MATRIZ
 	beq $t1 $t3 FIM_FILTRO
 RESET_LINHA:
-	addi $t3 $t3 1
+	addi $t3 $t3 0x01
 	li $t4 0x00
+	
+	#la $t5 new_line
+	# Escreve espaco no File OUT
+	#li $v0 0x0F
+    #move $a0 $k1
+	#move $a1 $t5
+    #li $a2 0x01
+    #syscall
+	
 	j RODAR_MATRIZ
 FIM_FILTRO:
 	j CLOSE_FILE
@@ -355,12 +396,13 @@ RET_ZERO:
 #-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
 #SUB ROTINA - Converte um int em uma string cujos caracteres e' o int
 INT_TO_STRING:
-	move $v0 $a0
-	move $v1 $a1
+	move $v0 $a0	# STRING
+	move $v1 $a1	# INT
 	
 	li $s0 0x04
 	li $s1 0x00
 	li $s3 0x00
+	li $s4 0x00
 	
 ZERAR:
 	sb $s1 ($v0)
@@ -373,6 +415,7 @@ ZERAR:
 	li $s0 0x3E8
 	div $s1 $s1 $s0
 	beqz $s1 DIG0_NULL
+	addi $s4 $s4 0x01
 	li $s3 0x01
 	move $s2 $s1
 	addi $s1 $s1 0x30
@@ -381,7 +424,6 @@ ZERAR:
 	mul $s1 $s2 0x3E8
 	sub $v1 $v1 $s1
 DIG0_NULL:
-	
 	move $s1 $v1
 	li $s0 0x64
 	div $s1 $s1 $s0
@@ -389,6 +431,7 @@ DIG0_NULL:
 	beqz $s1 DIG1_NULL
 	li $s3 0x01
 IMP_1:
+	addi $s4 $s4 0x01
 	move $s2 $s1
 	addi $s1 $s1 0x30
 	sb $s1 ($v0)
@@ -404,6 +447,7 @@ DIG1_NULL:
 	beqz $s1 DIG2_NULL
 	li $s3 0x01
 IMP_2:
+	addi $s4 $s4 0x01
 	move $s2 $s1
 	addi $s1 $s1 0x30
 	sb $s1 ($v0)
@@ -411,12 +455,13 @@ IMP_2:
 	mul $s1 $s2 0x0A
 	sub $v1 $v1 $s1
 DIG2_NULL:
-	
+	addi $s4 $s4 0x01
 	move $s1 $v1
 	addi $s1 $s1 0x30
 	sb $s1 ($v0)
 	
-	move $v0 $a0
+	move $v0 $a0	# STRING
+	move $v1 $s4	# INT
 	jr $ra
 
 #-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
@@ -553,6 +598,8 @@ GET_NUM_FILE:
 	li $s3 0x2F
 	li $s4 0x3A
 	move $s7 $s1
+	li $v1 0x00
+	
 	
 LER_NUM:
 	li $v0 0x0E		# system call for reading from file
@@ -571,7 +618,8 @@ LER_NUM:
 	addi $s7 $s7 0x01
 	j LER_NUM
 END_NUM:
-	
+
+	beqz $v1 LER_NUM
 	sub $sp $sp 4
 	sw $ra 0($sp)
 	move $a0 $s1
