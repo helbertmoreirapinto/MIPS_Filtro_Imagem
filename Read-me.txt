@@ -1,0 +1,43 @@
+|---------------------------------------|
+| NOME			| NUSP		|
+| Antonio Sebastian	| 10797781	|
+| Helbert M Pinto	| 10716504	|
+|---------------------------------------|
+
+
+TRABALHO FINAL - Organizacao e Arquitetura de Computadores
+
+O tema para trabalho que escolhemos desenvolver foi o de
+convolucao de imagens e desenvolvemos utilizando o software
+Mars.
+
+-> ATENCAO <-
+Para o correto funcionamento do aplicativo de conversao,
+deve-se atentar as seguintes informacoes:
+
+1) Deve conter junto a pasta que do arquivo da aplicacao (Trabalho.s)
+e o executavel do Mars (Mars.jar) duas imagens, sendo:
+   a- input.pgm - imagem original a ser convertida.
+   b- output.pgm - arquivo vazio que ao final da aplicacao contera a
+		imagem convertida - nao encontrei como criar arquivos
+		diretamente pela aplicacao em MIPS =/.
+
+2) Implementamos 03 filtros de convolucao (O codigo eh flexivel para
+a implementacao de N filtros, adicionando apenas um vetor de word
+com os valores do filtro e add uma referencia a variavel logo apos o
+menu). Os valores adotados na implementacao de tais filtros foram
+baseadas de acordo com o site "http://setosa.io/ev/image-kernels/".
+Os filtros implementados sao:
+   a- Identy (utilizado para teste geral verif se in e out eram iguais) 
+   b- Emboss
+   c- Sharpen
+
+Ao iniciar a aplicacao, deve aparecer o menu princiapl apos um curto periodo
+(poucos segundos) de carregamento (carregamento dos dados da imagem para a
+memoria - buffer). O usuario podera entao escolher dentre as 03 opcoes
+disponiveis qual convolucao deve ser aplicada a imagens original. Apos
+outro curto periodo de tempo (poucos segundos), onde e' realizado o calculo
+e escrita no arquivo destino, a aplicacao e' encerrada. Pode-se entao ir na
+pasta da aplicacao e conferir os resultados.
+
+ 

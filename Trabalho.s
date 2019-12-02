@@ -1,7 +1,7 @@
 .data
-	f_in:		.asciiz "input.pgm"		# File IN
+	f_in:		.asciiz "input.pgm"	# File IN
 	f_out:		.asciiz "output.pgm"	# File OUT
-	menu_p:		.asciiz "Filtros de Imagem\n[1]Filtro Identy\n[2]Filtro Emboss\n[3]Filtro Sharpen\n[0]Sair\nSelecione: "
+	menu:		.asciiz "Filtros de Imagem\n[1]Filtro Identy\n[2]Filtro Emboss\n[3]Filtro Sharpen\n[0]Sair\nSelecione: "
 	cab:		.asciiz "P2\n# Make by Antonio Sebastian / Helbert Pinto #\n"
 	new_line:	.asciiz "\n"
 	c_space:	.asciiz " "
@@ -24,102 +24,105 @@
 
 main:
 	# Open File IN [Read]
-	li $v0 0x0D	# system call for open file
-	la $a0 f_in	# input file name
-	li $a1 0x00	# flag for read
-	li $a2 0x00	# mode is ignored
-	syscall		# open file
+	li $v0 0x0D	# syscall para abrir arquivo
+	la $a0 f_in	# nome arquivo
+	li $a1 0x00	# flag para leitura
+	li $a2 0x00	# modo ignorado
+	syscall		# abrir arquivo
 	move $k0 $v0	# K0 -> File IN
 	
 	# Check sucess open File IN
 	beq $k0 -1 END_PROGRAM
 	
 	# Open File OUT [Write]
-	li $v0 0x0D	# system call for open file
-	la $a0 f_out	# input file name
-	li $a1 0x01	# flag for write
-	li $a2 0x00	# mode is ignored
-	syscall		# open file
+	li $v0 0x0D	# syscall para abrir arquivo
+	la $a0 f_out	# nome arquivo
+	li $a1 0x01	# flag para leitura
+	li $a2 0x00	# modo ignorado
+	syscall		# abrir arquivo
 	move $k1 $v0	# K1 -> File OUT
 	
+	# Check sucess open File OUT
 	beq $k1 -1 END_PROGRAM
 	
-	# Step header File IN
+	# Pular informacoes cabecalho
 	lb $t0 new_line
 	li $t3 0x00
-STEP_HREADER:
-	li $v0 0x0E
+PULA_CAB:
+	li $v0 0x0E		
 	move $a0 $k0
-	la $a1 temp			# Guarda temporariamente em temp o valor do current char
-	li $a2 0x01
-	syscall				# Le um char
-	lb $t1 temp			# Salva o char em t1
-	bne $t0 $t1 STEP_HREADER	# Check t0['\n'] != t1[current char]
-	addi $t3 $t3 0x01		# Incr cont '\n'
-	bne $t3 0x02 STEP_HREADER	# Pular 02 '\n'
+	la $a1 temp		# Guarda temporariamente em temp o valor do current char
+	li $a2 0x01		
+	syscall			# Le um char
+	lb $t1 temp		# Salva o char em t1
+	bne $t0 $t1 PULA_CAB	# Check t0['\n'] != t1[current char]
+	addi $t3 $t3 0x01	# Incr cont '\n'
+	bne $t3 0x02 PULA_CAB	# Pular 02 '\n'
 	
 	la $t1 val_byte
 	la $t2 temp
-	# Save X
-	sub $sp $sp 12
-	sw $k0 0($sp)	# File
+	
+	# Save tamano X da imagem
+	sub $sp $sp 0x0C
+	sw $k0 0($sp)	# Ponteiro Arquivo
 	sw $t1 4($sp)	# String val_byte
 	sw $t2 8($sp)	# Char 
 	jal GET_NUM_FILE
 	sw $v0 tamPicX
 	
-	# Save Y
-	sub $sp $sp 12
-	sw $k0 0($sp)	# File
+	# Save tamano Y da imagem
+	sub $sp $sp 0x0C
+	sw $k0 0($sp)	# Ponteiro Arquivo
 	sw $t1 4($sp)	# String val_byte
 	sb $t2 8($sp)	# Char 
 	jal GET_NUM_FILE
 	sw $v0 tamPicY
 	
-	# Save Max value
-	sub $sp $sp 12
-	sw $k0 0($sp)	# File
+	# Save valor maximo para o pixel
+	sub $sp $sp 0x0C
+	sw $k0 0($sp)	# Ponteiro Arquivo
 	sw $t1 4($sp)	# String val_byte
 	sb $t2 8($sp)	# Char 
 	jal GET_NUM_FILE
 	sw $v0 max_value
 
+	# Save qtdade de pixels na imagem (X * Y)
 	lw $t0 tamPicX
 	lw $t2 tamPicY
 	mulu $t1 $t0 $t2
 	sw $t1 bytesPic
-	#addi $t1 $t1 0x01
 	li $t0 0x00
 	la $t2 buffer
 	
 	la $t3 val_byte
 	la $t4 temp
 	
+	# Load buffer com os dados dos bytes da imagem
 WRITE_BUFFER:
-	sub $sp $sp 12
-	sw $k0 0($sp)	# File
+	sub $sp $sp 0x0C
+	sw $k0 0($sp)	# Ponteiro Arquivo
 	sw $t3 4($sp)	# String val_byte
 	sw $t4 8($sp)	# Char temp
 	jal GET_NUM_FILE
-	beq $v0 -1 WRITE_BUFFER 
+	beq $v0 -1 WRITE_BUFFER	# Caracter especial
 	sw $v0 ($t2)
 	addi $t2 $t2 0x04
 	addi $t0 $t0 0x01
 	bne $t0 $t1 WRITE_BUFFER
 	
 	# MENU
-	# Print menu_p in console
-	li $v0 0x04		# system call for print string
-	la $a0 menu_p	# select string
-	syscall			# print string
+	# Print menu in console
+	li $v0 0x04	# syscall para exibir string
+	la $a0 menu	# selecionar string
+	syscall		# exibir string
 	
 	# Get int keyboard
-	li $v0 0x05	# system call for get int keyboard
-	syscall		# get int keyboard
+	li $v0 0x05	# syscall para pegar int do teclado
+	syscall		# pegar int do teclado
 	move $t7 $v0
 	
-	# Write cab File OUT
-	la $t0 cab			# cab
+	# Write cabecalho no File OUT
+	la $t0 cab		# cab
 	la $t1 val_byte		# val_byte
 	la $t2 new_line		# new_line
 	la $t3 c_space		# c_space
@@ -127,7 +130,7 @@ WRITE_BUFFER:
 	lw $t5 tamPicY		# tamY
 	lw $t6 max_value	# max_val
 	
-	sub $sp $sp 0x20	
+	sub $sp $sp 0x20
 	sw $k1 00($sp)	# File OUT
 	sw $t0 04($sp)	# cab
 	sw $t1 08($sp)	# val_byte
@@ -163,17 +166,19 @@ APLICAR_FILTRO:
 	la $t0 buffer	# Matriz
 	lw $t1 tamPicX	# Max I
 	lw $t2 tamPicY	# Max J
-	li $t3 0x00		# I
-	li $t4 0x00		# J
-	li $t5 0x00		# indice ref pixel
-	li $t6 0x00		# indice_aux
-	li $t7 0x00		# Soma
+	li $t3 0x00	# I
+	li $t4 0x00	# J
+	li $t5 0x00	# indice ref pixel
+	li $t6 0x00	# indice_aux
+	li $t7 0x00	# Soma
 	
+	# Aplicando pixel a pixel a convolucao
 RODAR_MATRIZ:
-	
+
 	li $t7 0x00
-	sub $s0 $t2 0x01
 	
+	# Condicoes de borda -> valor do pixel = 0
+	sub $s0 $t2 0x01
 	beqz $t3 INSERE_PIXEL_FILE_OUT
 	beq $t1 $t3 INSERE_PIXEL_FILE_OUT
 	beqz $t4 INSERE_PIXEL_FILE_OUT
@@ -254,6 +259,7 @@ CALC_PIXEL:
 	jal CALCULO_VALOR_PIXEL
 	add $t7 $t7 $v0
 
+	# Ajustando o valor do pixel apos o calculo
 	slt $t8 $t7 $zero 
 	beq $t8 0x01 NEG
 	li $t8 0xFF
@@ -267,6 +273,7 @@ OVER:
 	li $t7 0xFF
 	j INSERE_PIXEL_FILE_OUT
 	
+	# Inserindo o valor do pixel no File OUT
 INSERE_PIXEL_FILE_OUT:
 	la $a0 val_byte
 	move $a1 $t7 
@@ -274,20 +281,20 @@ INSERE_PIXEL_FILE_OUT:
 	move $t7 $v0	# String com numero
 	move $t8 $v1	# Qtdade de digitos
 	
-	# Escreve o pixel no file OUT
-	li $v0 0x0F
-    move $a0 $k1
-	move $a1 $t7
-    move $a2 $t8
-    syscall
+	# Escreve o pixel no File OUT
+	li $v0 0x0F	# syscall para escrever no arquivo
+    move $a0 $k1	# ponteiro de arquivo
+	move $a1 $t7	# string a ser escrita
+ 	move $a2 $t8	# qtdade de bytes a ser escritos
+    syscall			# escrever no arquivo
 	
 	# Escreve espaco no File OUT
 	la $t5 c_space
 	li $v0 0x0F
-    move $a0 $k1
+	move $a0 $k1
 	move $a1 $t5
-    li $a2 0x01
-    syscall
+	li $a2 0x01
+	syscall
 	
 	addi $t4 $t4 0x01
 	bne $t2 $t4 RODAR_MATRIZ
@@ -296,37 +303,38 @@ RESET_LINHA:
 	addi $t3 $t3 0x01
 	li $t4 0x00
 	
-	la $t5 new_line
 	# Escreve enter no File OUT
+	la $t5 new_line
 	li $v0 0x0F
-    move $a0 $k1
+	move $a0 $k1
 	move $a1 $t5
-    li $a2 0x01
-    syscall
+	li $a2 0x01
+	syscall
 	
 	j RODAR_MATRIZ
 FIM_FILTRO:
 	j CLOSE_FILE
 
-
 CLOSE_FILE:
 	# Close File IN
-	li $v0 0x11		# system call for close file
-	move $a0 $k0	# file descriptor to close
-	syscall
+	li $v0 0x11	# syscall para fechar aquivo
+	move $a0 $k0	# ponteiro de arquivo
+	syscall		# fechar aquivo
 	
 	# Close File OUT
-	li $v0 0x11		# system call for close file
-	move $a0 $k1	# file descriptor to close
-	syscall
+	li $v0 0x11	# syscall para fechar aquivo
+	move $a0 $k1	# ponteiro de arquivo
+	syscall		# fechar aquivo
 
 END_PROGRAM:
-	# End Program
+	# Encerrar aplicacao
 	li $v0 0x0A
 	syscall
 
 #-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-#
 #SUB ROTINA - Converte uma string contendo um numero para int
+# param $a0 - Strinc com int
+# ret $v0 - int
 STRING_TO_INT:
 	li $v0 0x00
 	li $s0 0x00
@@ -480,7 +488,7 @@ ESCREVE_CAB:
 	move $a0 $s0
    	move $a1 $s1
 	la   $a2 0x31
-    syscall
+	syscall
 	
 	# X int to string 
 	move $a0 $s2
@@ -507,18 +515,18 @@ ESCREVE_CAB:
 	addi $sp $sp 0x20
 	
 	# Write X
-    li $v0 0x0F
+	li $v0 0x0F
 	move $a0 $s0
-    move $a1 $s5
-    la   $a2 0x03
-    syscall
+	move $a1 $s5
+	la   $a2 0x03
+	syscall
 	
 	# Write space
-    li $v0 0x0F
-    move $a0 $s0
+	li $v0 0x0F
+	move $a0 $s0
 	move $a1 $s4
-    la   $a2 0x1
-    syscall
+	la   $a2 0x1
+	syscall
 	
 	# Y int to string
 	move $a0 $s2
@@ -542,17 +550,17 @@ ESCREVE_CAB:
 	
 	# Write Y
 	li $v0 0x0F
-    move $a0 $s0
+	move $a0 $s0
 	move $a1 $s6
-    la   $a2 0x03
-    syscall
+	la   $a2 0x03
+	syscall
 	
 	# Write enter
-    li $v0 0x0F
-    move $a0 $s0
+	li $v0 0x0F
+	move $a0 $s0
 	move $a1 $s3
-    la   $a2 0x01
-    syscall
+	la   $a2 0x01
+	syscall
 	
 	# max int to string
 	move $a0 $s2
@@ -572,17 +580,17 @@ ESCREVE_CAB:
 	
 	# Write MAX
 	li $v0 0x0F
-    move $a0 $s0
+	move $a0 $s0
 	move $a1 $s7
-    la   $a2 0x03
-    syscall
+	la   $a2 0x03
+	syscall
 	
 	# Write enter
-    li $v0 0x0F
-    move $a0 $s0
+	li $v0 0x0F
+	move $a0 $s0
 	move $a1 $s3
-    la   $a2 0x01
-    syscall
+	la   $a2 0x01
+	syscall
 	
 	jr $ra
 
@@ -597,7 +605,6 @@ GET_NUM_FILE:
 	li $s4 0x3A
 	move $s7 $s1
 	li $v1 0x00
-	
 	
 LER_NUM:
 	li $v0 0x0E		# system call for reading from file
