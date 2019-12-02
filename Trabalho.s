@@ -76,12 +76,6 @@ STEP_HREADER:
 	jal GET_NUM_FILE
 	sw $v0 tamPicY
 	
-	li $v0 0x0E
-	move $a0 $k0
-	la   $a1 temp
-	li   $a2 0x01
-	syscall
-	
 	# Save Max value
 	sub $sp $sp 12
 	sw $k0 0($sp)	# File
@@ -152,14 +146,17 @@ WRITE_BUFFER:
 
 SEL_FILTRO_1:
 	# Filter 1 - Identy
+	la $t9 FilIdenty
 	j APLICAR_FILTRO
 	
 SEL_FILTRO_2:
 	# Filter 2 - Emboss
+	la $t9 FilEmboss
 	j APLICAR_FILTRO
 	
 SEL_FILTRO_3:
 	# Filter 3 - Sharpen
+	la $t9 FilSharpen
 	j APLICAR_FILTRO
 
 APLICAR_FILTRO:
@@ -171,23 +168,23 @@ APLICAR_FILTRO:
 	li $t5 0x00		# indice ref pixel
 	li $t6 0x00		# indice_aux
 	li $t7 0x00		# Soma
-	la $t9 c_space
 	
 RODAR_MATRIZ:
 	
 	li $t7 0x00
+	sub $s0 $t2 0x01
 	
 	beqz $t3 INSERE_PIXEL_FILE_OUT
 	beq $t1 $t3 INSERE_PIXEL_FILE_OUT
 	beqz $t4 INSERE_PIXEL_FILE_OUT
-	beq $t2 $t4 INSERE_PIXEL_FILE_OUT
+	beq $s0 $t4 INSERE_PIXEL_FILE_OUT
 	
 	mul $t5 $t3 0x64
 	add $t5 $t5 $t4
 	
 CALC_PIXEL:
 	sub $t6 $t5 0x65
-	li $t8 0x00 	# multiplicador pixel Top-Left
+	lW $t8 0($t9)	 	# multiplicador pixel Top-Left
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -195,7 +192,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 	
 	sub $t6 $t5 0x64
-	li $t8 0x00 	# multiplicador pixel Top
+	lw $t8 4($t9) 		# multiplicador pixel Top
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -203,7 +200,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 
 	sub $t6 $t5 0x63
-	li $t8 0x00 	# multiplicador pixel Top-Right
+	lw $t8 8($t9)	 	# multiplicador pixel Top-Right
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -211,14 +208,14 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 	
 	sub $t6 $t5 0x01
-	li $t8 0x00 	# multiplicador pixel Left
+	lw $t8 12($t9) 		# multiplicador pixel Left
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
 	jal CALCULO_VALOR_PIXEL
 	add $t7 $t7 $v0
 	
-	li $t8 0x01 	# multiplicador pixel Center
+	lw $t8 16($t9)	 	# multiplicador pixel Center
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -226,7 +223,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 	
 	addi $t6 $t5 0x01
-	li $t8 0x00 	# multiplicador pixel Right
+	lw $t8 20($t9)	 	# multiplicador pixel Right
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -234,7 +231,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 	
 	addi $t6 $t5 0x63
-	li $t8 0x00 	# multiplicador pixel Botton-Left
+	lw $t8 24($t9)	 	# multiplicador pixel Botton-Left
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -242,7 +239,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 	
 	addi $t6 $t5 0x64
-	li $t8 0x00 	# multiplicador pixel Botton
+	lw $t8 28($t9) 		# multiplicador pixel Botton
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -250,7 +247,7 @@ CALC_PIXEL:
 	add $t7 $t7 $v0
 
 	addi $t6 $t5 0x65
-	li $t8 0x00 	# multiplicador pixel Botton-Right
+	lw $t8 32($t9)	 	# multiplicador pixel Botton-Right
 	move $a0 $t0		# Buffer
 	move $a1 $t6		# indice
 	move $a2 $t8		# multiplicador
@@ -285,9 +282,10 @@ INSERE_PIXEL_FILE_OUT:
     syscall
 	
 	# Escreve espaco no File OUT
+	la $t5 c_space
 	li $v0 0x0F
     move $a0 $k1
-	move $a1 $t9
+	move $a1 $t5
     li $a2 0x01
     syscall
 	
@@ -298,13 +296,13 @@ RESET_LINHA:
 	addi $t3 $t3 0x01
 	li $t4 0x00
 	
-	#la $t5 new_line
-	# Escreve espaco no File OUT
-	#li $v0 0x0F
-    #move $a0 $k1
-	#move $a1 $t5
-    #li $a2 0x01
-    #syscall
+	la $t5 new_line
+	# Escreve enter no File OUT
+	li $v0 0x0F
+    move $a0 $k1
+	move $a1 $t5
+    li $a2 0x01
+    syscall
 	
 	j RODAR_MATRIZ
 FIM_FILTRO:
@@ -614,6 +612,7 @@ LER_NUM:
 	slt $s6 $s4 $s5
 	beq $s6 0x01 END_NUM
 	
+	li $v1 0x01
 	sb $s5 ($s7)
 	addi $s7 $s7 0x01
 	j LER_NUM
